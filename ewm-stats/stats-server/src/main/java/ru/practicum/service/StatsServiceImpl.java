@@ -34,9 +34,9 @@ public class StatsServiceImpl implements StatsService {
         LocalDateTime endDateTime = LocalDateTime.parse(end, dateTimeFormatter);
         List<ViewStats> statsHits;
         if (unique) {
-            statsHits = statsRepository.StatsHitUnique(startDateTime, endDateTime, uris);
+            statsHits = statsRepository.statsHitUnique(startDateTime, endDateTime, uris);
         } else {
-            statsHits = statsRepository.StatsHitNotUnique(startDateTime, endDateTime, uris);
+            statsHits = statsRepository.statsHitNotUnique(startDateTime, endDateTime, uris);
         }
         return statsHits.stream()
                         .map(StatsMapper::toViewStatsDto)
