@@ -9,7 +9,7 @@ services:
     depends_on:
       - stats-db
     entrypoint:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://stats-db:5432/stats-db
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/stats-db
       - stats-server.uri=http://stats-server:9090
 
   stats-db:
