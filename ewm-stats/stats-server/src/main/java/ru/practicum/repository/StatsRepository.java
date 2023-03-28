@@ -17,7 +17,7 @@ public interface StatsRepository extends JpaRepository<EndpointHit, Integer> {
            "where e.timestamp >= ?1 " +
            "and e.timestamp <= ?2 " +
            "and e.uri in ?3 " +
-           "group by e.ip, e.uri " +
+           "group by e.app, e.uri " +
            "order by count(distinct e.ip) desc")
     List<ViewStats> statsHitUnique(LocalDateTime start, LocalDateTime end, List<String> uris);
 
@@ -26,7 +26,7 @@ public interface StatsRepository extends JpaRepository<EndpointHit, Integer> {
             "where e.timestamp >= ?1 " +
             "and e.timestamp <= ?2 " +
             "and e.uri in ?3 " +
-            "group by e.ip, e.uri " +
+            "group by e.app, e.uri " +
             "order by count(e.ip) desc")
     List<ViewStats> statsHitNotUnique(LocalDateTime start, LocalDateTime end, List<String> uris);
 }
