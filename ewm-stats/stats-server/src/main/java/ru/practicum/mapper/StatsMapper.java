@@ -1,10 +1,13 @@
 package ru.practicum.mapper;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.model.EndpointHit;
 import ru.practicum.model.ViewStats;
 
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class StatsMapper {
 
     public static EndpointHit toEndpointHit(EndpointHitDto endpointHitDto) {

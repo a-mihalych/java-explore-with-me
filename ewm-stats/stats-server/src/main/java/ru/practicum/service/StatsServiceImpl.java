@@ -10,7 +10,6 @@ import ru.practicum.model.ViewStats;
 import ru.practicum.repository.StatsRepository;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,15 +27,20 @@ public class StatsServiceImpl implements StatsService {
     }
 
     @Override
-    public List<ViewStatsDto> hits(String start, String end, List<String> uris, Boolean unique) {
-        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-        LocalDateTime startDateTime = LocalDateTime.parse(start, dateTimeFormatter);
-        LocalDateTime endDateTime = LocalDateTime.parse(end, dateTimeFormatter);
+    public List<ViewStatsDto> hits(LocalDateTime start, LocalDateTime end, List<String> uris, Boolean unique) {
         List<ViewStats> statsHits;
-        if (unique) {
-            statsHits = statsRepository.statsHitUnique(startDateTime, endDateTime, uris);
+        if (uris == null || uris.isEmpty()) {
+            if (unique) {
+                statsHits = statsRepository.statsHitNotUrisUnique(start, end);
+            } else {
+                statsHits = statsRepository.statsHitNotUrisNotUnique(start, end);
+            }
         } else {
-            statsHits = statsRepository.statsHitNotUnique(startDateTime, endDateTime, uris);
+            if (unique) {
+                statsHits = statsRepository.statsHitUnique(start, end, uris);
+            } else {
+                statsHits = statsRepository.statsHitNotUnique(start, end, uris);
+            }
         }
         return statsHits.stream()
                         .map(StatsMapper::toViewStatsDto)

@@ -2,18 +2,17 @@ package ru.practicum.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.dto.ViewStatsDto;
 import ru.practicum.dto.EndpointHitDto;
 import ru.practicum.service.StatsService;
 
 import javax.validation.Valid;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
 @RequiredArgsConstructor
-@Validated
 @Slf4j
 public class StatsController {
 
@@ -26,9 +25,9 @@ public class StatsController {
     }
 
     @GetMapping("/stats")
-    public List<ViewStatsDto> hits(@RequestParam String start,
-                                   @RequestParam String end,
-                                   @RequestParam List<String> uris,
+    public List<ViewStatsDto> hits(@RequestParam LocalDateTime start,
+                                   @RequestParam LocalDateTime end,
+                                   @RequestParam(required = false) List<String> uris,
                                    @RequestParam(defaultValue = "false") Boolean unique) {
         log.info("* Запрос Get: получение статистики: начало - {}, конец - {}, адреса - {}, уникалность - {}",
                  start, end, uris, unique);
