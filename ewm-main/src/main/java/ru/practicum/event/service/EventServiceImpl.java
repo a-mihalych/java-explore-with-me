@@ -254,7 +254,7 @@ public class EventServiceImpl implements EventService {
         List<Request> requests = requestRepository.findAllByIdIn(newStatus.getRequestIds());
         int countOld = requests.size();
         requests.stream()
-                .filter(request -> "PENDING".equals(request.getStatus()))
+                .filter(request -> "PENDING".equals(request.getStatus().toString()))
                 .collect(Collectors.toList());
         String requestNotPending = countOld > requests.size() ?
                 "Cтатус можно изменить только у заявок, находящихся в состоянии ожидания\n" : "";
