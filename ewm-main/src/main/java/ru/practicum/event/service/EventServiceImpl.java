@@ -21,8 +21,6 @@ import ru.practicum.event.repository.EventRepository;
 import ru.practicum.locate.mapper.LocateMapper;
 import ru.practicum.locate.model.Locate;
 import ru.practicum.locate.repository.LocateRepository;
-import ru.practicum.mapper.StatsMapper;
-import ru.practicum.repository.StatsRepository;
 import ru.practicum.request.dto.EventRequestStatusUpdateRequest;
 import ru.practicum.request.dto.EventRequestStatusUpdateResult;
 import ru.practicum.request.dto.ParticipationRequestDto;
@@ -30,6 +28,7 @@ import ru.practicum.request.mapper.RequestMapper;
 import ru.practicum.request.model.Request;
 import ru.practicum.request.model.RequestStatus;
 import ru.practicum.request.repository.RequestRepository;
+import ru.practicum.stats.Stats;
 import ru.practicum.user.model.User;
 import ru.practicum.user.repository.UserRepository;
 
@@ -52,7 +51,7 @@ public class EventServiceImpl implements EventService {
     private final UserRepository userRepository;
     private final LocateRepository locateRepository;
     private final RequestRepository requestRepository;
-    private final StatsRepository statsRepository;
+    private final Stats stats;
 
     @Override
     public EventFullDto eventById(Integer id, HttpServletRequest request) {
@@ -61,13 +60,18 @@ public class EventServiceImpl implements EventService {
             throw new NotFoundException(String.format("Событие с id = %d не опубликовано", id));
         }
         request.getRemoteAddr();
-        statsRepository.save(StatsMapper.toEndpointHit(new EndpointHitDto("ewm-main",
-                                                                          request.getRequestURL().toString(),
-                                                                          request.getRemoteAddr(),
-                                                                          LocalDateTime.now())));
+        stats.addHit(EndpointHitDto.builder()
+                        .app("ewm-main")
+                        .uri(request.getRequestURL().toString())
+                        .ip(request.getRemoteAddr())
+                        .timestamp(LocalDateTime.now())
+                        .build());
         return EventMapper.toEventFullDto(event,
                 requestRepository.countRequestConfirmed(id),
-                Math.toIntExact(statsRepository.viewStats("/events/" + event.getId()).getHits()));
+                Math.toIntExact(stats.hits("2000-01-01 00:00:00",
+                        "3000-01-01 00:00:00",
+                        List.of(request.getRequestURL().toString()),
+                        true).get(0).getHits()));
     }
 
     @Override
@@ -83,7 +87,10 @@ public class EventServiceImpl implements EventService {
         List<EventFullDto> eventFullDtos = events.stream()
                 .map(event -> EventMapper.toEventFullDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
-                        Math.toIntExact(statsRepository.viewStats("/events/" + event.getId()).getHits())))
+                        Math.toIntExact(stats.hits("2000-01-01 00:00:00",
+                                "3000-01-01 00:00:00",
+                                List.of(request.getRequestURL().toString()),
+                                true).get(0).getHits())))
                 .collect(Collectors.toList());
         if (onlyAvailable) {
             eventFullDtos.stream().filter(event -> event.getConfirmedRequests() < event.getParticipantLimit());
@@ -91,12 +98,17 @@ public class EventServiceImpl implements EventService {
         List<EventShortDto> eventShortDtos = events.stream()
                 .map(event -> EventMapper.toEventShortDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
-                        Math.toIntExact(statsRepository.viewStats("/events").getHits())))
+                        Math.toIntExact(stats.hits("2000-01-01 00:00:00",
+                                "3000-01-01 00:00:00",
+                                List.of(request.getRequestURL().toString()),
+                                true).get(0).getHits())))
                 .collect(Collectors.toList());
-        statsRepository.save(StatsMapper.toEndpointHit(new EndpointHitDto("ewm-main",
-                                                                          request.getRequestURL().toString(),
-                                                                          request.getRemoteAddr(),
-                                                                          LocalDateTime.now())));
+        stats.addHit(EndpointHitDto.builder()
+                .app("ewm-main")
+                .uri(request.getRequestURL().toString())
+                .ip(request.getRemoteAddr())
+                .timestamp(LocalDateTime.now())
+                .build());
         if ("VIEWS".equals(sort)) {
             eventShortDtos.sort(Comparator.comparingInt(EventShortDto::getConfirmedRequests));
         }
@@ -112,7 +124,10 @@ public class EventServiceImpl implements EventService {
                     .stream()
                     .map(event -> EventMapper.toEventFullDto(event,
                             requestRepository.countRequestConfirmed(event.getId()),
-                            Math.toIntExact(statsRepository.viewStats("/admin/events").getHits())))
+                            Math.toIntExact(stats.hits("2000-01-01 00:00:00",
+                                    "3000-01-01 00:00:00",
+                                    List.of("/admin/events"),
+                                    true).get(0).getHits())))
                     .collect(Collectors.toList());
     }
 
@@ -139,7 +154,10 @@ public class EventServiceImpl implements EventService {
         event = EventMapper.toEvent(event, updateEventRequest, category);
         return EventMapper.toEventFullDto(eventRepository.save(event),
                 requestRepository.countRequestConfirmed(eventId),
-                Math.toIntExact(statsRepository.viewStats("/events/" + event.getId()).getHits()));
+                Math.toIntExact(stats.hits("2000-01-01 00:00:00",
+                        "3000-01-01 00:00:00",
+                        List.of("/events/" + event.getId()),
+                        true).get(0).getHits()));
     }
 
     @Override
@@ -148,7 +166,10 @@ public class EventServiceImpl implements EventService {
         return eventRepository.findAllByInitiatorId(userId, PageRequest.of(from / size, size)).stream()
                 .map(event -> EventMapper.toEventShortDto(event,
                             requestRepository.countRequestConfirmed(event.getId()),
-                            Math.toIntExact(statsRepository.viewStats("/users/{userId}/events").getHits())))
+                        Math.toIntExact(stats.hits("2000-01-01 00:00:00",
+                                "3000-01-01 00:00:00",
+                                List.of("/users/{userId}/events"),
+                                true).get(0).getHits())))
                 .collect(Collectors.toList());
     }
 
@@ -172,7 +193,10 @@ public class EventServiceImpl implements EventService {
         }
         return EventMapper.toEventFullDto(event,
                 requestRepository.countRequestConfirmed(eventId),
-                Math.toIntExact(statsRepository.viewStats("/events/" + event.getId()).getHits()));
+                Math.toIntExact(stats.hits("2000-01-01 00:00:00",
+                        "3000-01-01 00:00:00",
+                        List.of("/events/" + event.getId()),
+                                true).get(0).getHits()));
     }
 
     @Override
@@ -202,7 +226,10 @@ public class EventServiceImpl implements EventService {
         event = EventMapper.toEvent(event, updateEventRequest, category);
         return EventMapper.toEventFullDto(eventRepository.save(event),
                 requestRepository.countRequestConfirmed(eventId),
-                Math.toIntExact(statsRepository.viewStats("/events/" + event.getId()).getHits()));
+                Math.toIntExact(stats.hits("2000-01-01 00:00:00",
+                        "3000-01-01 00:00:00",
+                        List.of("/events/" + event.getId()),
+                                true).get(0).getHits()));
     }
 
     @Override
