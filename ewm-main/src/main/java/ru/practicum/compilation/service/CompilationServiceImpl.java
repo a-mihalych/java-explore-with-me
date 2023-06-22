@@ -15,8 +15,8 @@ import ru.practicum.event.dto.EventShortDto;
 import ru.practicum.event.mapper.EventMapper;
 import ru.practicum.event.model.Event;
 import ru.practicum.event.repository.EventRepository;
-import ru.practicum.repository.StatsRepository;
 import ru.practicum.request.repository.RequestRepository;
+import ru.practicum.stats.Stats;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,7 +30,7 @@ public class CompilationServiceImpl implements CompilationService {
     private final CompilationRepository compilationRepository;
     private final RequestRepository requestRepository;
     private final EventRepository eventRepository;
-    private final StatsRepository statsRepository;
+    private final Stats stats;
 
     @Override
     public List<CompilationDto> compilations(Boolean pinned, Integer from, Integer size) {
@@ -38,7 +38,10 @@ public class CompilationServiceImpl implements CompilationService {
                 .map(compilation -> CompilationMapper.toCompilationDto(compilation, compilation.getEvents().stream()
                         .map(event -> EventMapper.toEventShortDto(event,
                                 requestRepository.countRequestConfirmed(event.getId()),
-                                Math.toIntExact(statsRepository.viewStats("/users/{userId}/events").getHits())))
+                                Math.toIntExact(stats.hits("2000-01-01 00:00:00",
+                                        "3000-01-01 00:00:00",
+                                        List.of("/users/{userId}/events"),
+                                        true).get(0).getHits())))
                         .collect(Collectors.toList())))
                 .collect(Collectors.toList());
     }
@@ -51,7 +54,10 @@ public class CompilationServiceImpl implements CompilationService {
         List<EventShortDto> eventShortDtos = compilation.getEvents().stream()
                 .map(event -> EventMapper.toEventShortDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
-                        Math.toIntExact(statsRepository.viewStats("/users/{userId}/events").getHits())))
+                        Math.toIntExact(stats.hits("2000-01-01 00:00:00",
+                                "3000-01-01 00:00:00",
+                                List.of("/users/{userId}/events"),
+                                true).get(0).getHits())))
                 .collect(Collectors.toList());
         return CompilationMapper.toCompilationDto(compilation, eventShortDtos);
     }
@@ -73,7 +79,10 @@ public class CompilationServiceImpl implements CompilationService {
         List<EventShortDto> eventShortDtos = compilation.getEvents().stream()
                 .map(event -> EventMapper.toEventShortDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
-                        Math.toIntExact(statsRepository.viewStats("/events/" + event.getId()).getHits())))
+                        Math.toIntExact(stats.hits("2000-01-01 00:00:00",
+                                "3000-01-01 00:00:00",
+                                List.of("/events/" + event.getId()),
+                                true).get(0).getHits())))
                 .collect(Collectors.toList());
         return CompilationMapper.toCompilationDto(compilation, eventShortDtos);
     }
@@ -106,7 +115,10 @@ public class CompilationServiceImpl implements CompilationService {
         List<EventShortDto> eventShortDtos = events.stream()
                 .map(event -> EventMapper.toEventShortDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
-                        Math.toIntExact(statsRepository.viewStats("/users/{userId}/events").getHits())))
+                        Math.toIntExact(stats.hits("2000-01-01 00:00:00",
+                                "3000-01-01 00:00:00",
+                                List.of("/users/{userId}/events"),
+                                true).get(0).getHits())))
                 .collect(Collectors.toList());
         return CompilationMapper.toCompilationDto(compilationRepository
                 .save(CompilationMapper.toCompilation(compId, updateCompilationRequest, events)), eventShortDtos);
