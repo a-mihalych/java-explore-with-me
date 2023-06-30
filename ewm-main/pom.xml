@@ -45,16 +45,8 @@
 
         <dependency>
             <groupId>ru.practicum</groupId>
-            <artifactId>stats-server</artifactId>
-            <version>0.0.1-SNAPSHOT</version>
-            <scope>compile</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>ru.practicum</groupId>
             <artifactId>stats-client</artifactId>
             <version>0.0.1-SNAPSHOT</version>
-            <scope>compile</scope>
         </dependency>
 
 		<dependency>
@@ -64,7 +56,8 @@
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-actuator</artifactId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
 		</dependency>
 
 		<dependency>
