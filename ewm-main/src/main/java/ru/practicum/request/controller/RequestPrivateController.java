@@ -15,7 +15,7 @@ import java.util.List;
 @Slf4j
 public class RequestPrivateController {
 
-    RequestService requestService;
+    private final RequestService requestService;
 
     @ResponseStatus(HttpStatus.OK)
     @GetMapping

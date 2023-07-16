@@ -54,16 +54,16 @@ public class RequestServiceImpl implements RequestService {
         if (event.getEventState() != EventState.PUBLISHED) {
             throw new ConflictException("Нельзя участвовать в неопубликованном событии");
         }
-        int numberParticipants = requestRepository
-                .findByEventIdAndStatus(event.getId(), EventState.PENDING.name()).size();
-        if (event.getParticipantLimit() <= numberParticipants) {
+        int numberParticipants = requestRepository.countRequestConfirmed(event.getId());
+        int participantLimit = event.getParticipantLimit();
+        if (participantLimit != 0 && participantLimit <= numberParticipants) {
             throw new ConflictException("Запрос на участие не добавлен, достигнут лимит запросов на участие");
         }
         if (requestRepository.findByEventIdAndRequesterId(event.getId(), userId).size() > 0) {
             throw new ConflictException("Нельзя добавить повторный запрос");
         }
         RequestStatus requestStatus = RequestStatus.PENDING;
-        if (!event.getRequestModeration()) {
+        if (!event.getRequestModeration() || participantLimit == 0) {
             requestStatus = RequestStatus.CONFIRMED;
         }
         Request request = requestRepository.save(Request.builder()
@@ -81,10 +81,13 @@ public class RequestServiceImpl implements RequestService {
         User user = userRepository.findById(userId).orElseThrow(() -> {
             throw new NotFoundException(String.format("Не найден пользователь с id = %d", userId));
         });
-        Request request = requestRepository.findByIdAndRequesterId(userId, requestId).orElseThrow(() -> {
-            throw new NotFoundException(String.format("Не найден запрос с id = %d и пользователем с id = %d",
-                                                      requestId, userId));
+        Request request = requestRepository.findById(requestId).orElseThrow(() -> {
+            throw new NotFoundException(String.format("Не найден запрос с id = %d", requestId));
         });
+        if (!request.getRequester().getId().equals(userId)) {
+            throw new NotFoundException(String.format("Пользователь с id = %d не является владельцем запроса с id = %d",
+                                                      userId, requestId));
+        }
         request.setStatus(RequestStatus.CANCELED);
         return RequestMapper.toParticipationRequestDto(requestRepository.save(request));
     }

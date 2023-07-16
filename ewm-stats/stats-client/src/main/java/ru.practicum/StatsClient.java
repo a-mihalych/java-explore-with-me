@@ -15,8 +15,7 @@ import java.util.List;
 public class StatsClient extends BaseClient {
 
     @Autowired
-//    public StatsClient(@Value("${stats-server.uri}") String serverUrl, RestTemplateBuilder builder) {
-    public StatsClient(@Value("http://localhost:9090") String serverUrl, RestTemplateBuilder builder) {
+   public StatsClient(@Value("${stats-server.uri}") String serverUrl, RestTemplateBuilder builder) {
         super(
                 builder
                         .uriTemplateHandler(new DefaultUriBuilderFactory(serverUrl))
@@ -30,6 +29,11 @@ public class StatsClient extends BaseClient {
     }
 
     public ResponseEntity<Object> hits(String start, String end, List<String> uris, Boolean unique) {
-        return get("/stats", start, end, uris, unique);
+        StringBuilder stringBuilder = new StringBuilder();
+        if (uris != null) {
+            stringBuilder.append("uris=").append(String.join("&uris=", uris)).append("&");
+        }
+        String path = "/stats?start={start}&end={end}&" + stringBuilder + "unique={unique}";
+        return get(path, start, end, unique);
     }
 }

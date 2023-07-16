@@ -3,6 +3,7 @@ package ru.practicum.event.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import ru.practicum.event.dto.*;
 import ru.practicum.event.service.EventService;
@@ -10,11 +11,13 @@ import ru.practicum.request.dto.EventRequestStatusUpdateRequest;
 import ru.practicum.request.dto.EventRequestStatusUpdateResult;
 import ru.practicum.request.dto.ParticipationRequestDto;
 
+import javax.validation.Valid;
 import java.util.List;
 
 @RestController()
 @RequestMapping("/users/{userId}/events")
 @RequiredArgsConstructor
+@Validated
 @Slf4j
 public class EventPrivateController {
 
@@ -32,7 +35,7 @@ public class EventPrivateController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public EventFullDto createEvent(@PathVariable Integer userId, @RequestBody NewEventDto newEventDto) {
+    public EventFullDto createEvent(@PathVariable Integer userId, @RequestBody @Valid NewEventDto newEventDto) {
         log.info("* Запрос Post: создание события {}, пользователем с id = {}", newEventDto, userId);
         return eventService.createEvent(userId, newEventDto);
     }

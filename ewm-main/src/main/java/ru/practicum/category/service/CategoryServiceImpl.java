@@ -55,7 +55,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional
     public CategoryDto updateCategory(Integer catId, NewCategoryDto newCategoryDto) {
         categoryRepository.findById(catId).orElseThrow(() -> {
-           throw new NotFoundException(String.format("Не найдена категория с id = %d", catId));
+            throw new NotFoundException(String.format("Не найдена категория с id = %d", catId));
         });
         return CategoryMapper.toCategoryDto(categoryRepository.save(CategoryMapper.toCategory(catId, newCategoryDto)));
     }

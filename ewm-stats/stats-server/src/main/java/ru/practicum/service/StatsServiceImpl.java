@@ -28,6 +28,12 @@ public class StatsServiceImpl implements StatsService {
 
     @Override
     public List<ViewStatsDto> hits(LocalDateTime start, LocalDateTime end, List<String> uris, Boolean unique) {
+        if (start == null || end == null) {
+            throw new IllegalArgumentException("Не заданы параметры начала или конца события");
+        }
+        if (!start.isBefore(end)) {
+            throw new IllegalArgumentException("Событие должно начинаться раньше его окончания");
+        }
         List<ViewStats> statsHits;
         if (uris == null || uris.isEmpty()) {
             if (unique) {

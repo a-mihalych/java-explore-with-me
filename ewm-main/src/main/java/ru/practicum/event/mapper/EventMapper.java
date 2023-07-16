@@ -13,9 +13,12 @@ import ru.practicum.user.mapper.UserMapper;
 import ru.practicum.user.model.User;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class EventMapper {
+
+    private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public static Event toEvent(NewEventDto newEventDto, Category category, User user, Locate locate) {
         return Event.builder()
@@ -26,10 +29,10 @@ public class EventMapper {
                 .eventDate(newEventDto.getEventDate())
                 .initiator(user)
                 .locate(locate)
-                .paid(newEventDto.getPaid())
-                .participantLimit(newEventDto.getParticipantLimit())
+                .paid(newEventDto.getPaid() != null ? newEventDto.getPaid() : false)
+                .participantLimit(newEventDto.getParticipantLimit() != null ? newEventDto.getParticipantLimit() : 0)
                 .publishedOn(null)
-                .requestModeration(newEventDto.getRequestModeration())
+                .requestModeration(newEventDto.getRequestModeration() != null ? newEventDto.getRequestModeration() : true)
                 .eventState(EventState.PENDING)
                 .title(newEventDto.getTitle())
                 .build();
@@ -41,13 +44,15 @@ public class EventMapper {
                 .annotation(event.getAnnotation())
                 .category(CategoryMapper.toCategoryDto(event.getCategory()))
                 .confirmedRequests(confirmedRequests)
-                .createdOn(event.getCreatedOn().toString())
+                .createdOn(event.getCreatedOn().format(FORMATTER))
                 .description(event.getDescription())
-                .eventDate(event.getEventDate().toString())
+                .eventDate(event.getEventDate().format(FORMATTER))
                 .initiator(UserMapper.toUserShortDto(event.getInitiator()))
                 .location(LocateMapper.toLocation(event.getLocate()))
                 .paid(event.getPaid())
                 .participantLimit(event.getParticipantLimit())
+                .publishedOn(event.getPublishedOn() != null ? event.getPublishedOn().format(FORMATTER) : null)
+                .requestModeration(event.getRequestModeration())
                 .state(event.getEventState().name())
                 .title(event.getTitle())
                 .views(views)
@@ -60,7 +65,7 @@ public class EventMapper {
                 .annotation(event.getAnnotation())
                 .category(CategoryMapper.toCategoryDto(event.getCategory()))
                 .confirmedRequests(confirmedRequests)
-                .eventDate(event.getEventDate().toString())
+                .eventDate(event.getEventDate().format(FORMATTER))
                 .initiator(UserMapper.toUserShortDto(event.getInitiator()))
                 .paid(event.getPaid())
                 .title(event.getTitle())

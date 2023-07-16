@@ -45,9 +45,4 @@ public interface StatsRepository extends JpaRepository<EndpointHit, Integer> {
             "group by e.app, e.uri " +
             "order by count(e.ip) desc")
     List<ViewStats> statsHitNotUrisNotUnique(LocalDateTime start, LocalDateTime end);
-
-    @Query("select new ru.practicum.model.ViewStats(e.app, e.uri, count(e.ip)) " +
-            "from EndpointHit as e " +
-            "where e.uri = ?1")
-    ViewStats viewStats(String uri);
 }

@@ -23,7 +23,9 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<UserDto> users(List<Integer> ids, Integer from, Integer size) {
         if (ids == null || ids.isEmpty()) {
-            return List.of();
+            return userRepository.findAll(PageRequest.of(from / size, size)).stream()
+                                                                                 .map(UserMapper::toUserDto)
+                                                                                 .collect(Collectors.toList());
         }
         return userRepository.findAllByIdIn(ids, PageRequest.of(from / size, size)).stream()
                                                                                         .map(UserMapper::toUserDto)

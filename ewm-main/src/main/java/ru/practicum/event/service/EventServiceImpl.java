@@ -1,5 +1,8 @@
 package ru.practicum.event.service;
 
+import com.querydsl.core.BooleanBuilder;
+import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.Expressions;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -13,10 +16,7 @@ import ru.practicum.error.exception.NotFoundException;
 import ru.practicum.error.exception.ValidationException;
 import ru.practicum.event.dto.*;
 import ru.practicum.event.mapper.EventMapper;
-import ru.practicum.event.model.Event;
-import ru.practicum.event.model.EventAdminStateAction;
-import ru.practicum.event.model.EventPrivateStateAction;
-import ru.practicum.event.model.EventState;
+import ru.practicum.event.model.*;
 import ru.practicum.event.repository.EventRepository;
 import ru.practicum.locate.mapper.LocateMapper;
 import ru.practicum.locate.model.Locate;
@@ -34,8 +34,8 @@ import ru.practicum.user.repository.UserRepository;
 
 import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
-import java.util.Comparator;
-import java.util.List;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static ru.practicum.request.model.RequestStatus.CONFIRMED;
@@ -59,19 +59,15 @@ public class EventServiceImpl implements EventService {
         if (event.getEventState() != EventState.PUBLISHED) {
             throw new NotFoundException(String.format("Событие с id = %d не опубликовано", id));
         }
-        request.getRemoteAddr();
         stats.addHit(EndpointHitDto.builder()
-                        .app("ewm-main")
-                        .uri(request.getRequestURL().toString())
+                        .app("ewm-main-service")
+                        .uri("/events/" + id)
                         .ip(request.getRemoteAddr())
                         .timestamp(LocalDateTime.now())
                         .build());
-        return EventMapper.toEventFullDto(event,
-                requestRepository.countRequestConfirmed(id),
-                Math.toIntExact(stats.hits("2000-01-01 00:00:00",
-                        "3000-01-01 00:00:00",
-                        List.of(request.getRequestURL().toString()),
-                        true).get(0).getHits()));
+        int countHits = stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
+                                        List.of("/events/" + event.getId()), true);
+        return EventMapper.toEventFullDto(event, requestRepository.countRequestConfirmed(id), countHits);
     }
 
     @Override
@@ -82,15 +78,33 @@ public class EventServiceImpl implements EventService {
             rangeStart = LocalDateTime.now();
             rangeEnd = null;
         }
-        List<Event> events = eventRepository.events(text.toLowerCase(), categories, paid, rangeStart, rangeEnd,
-                PageRequest.of(from / size, size));
+        if (rangeStart != null && rangeEnd != null && !rangeStart.isBefore(rangeEnd)) {
+            throw new ValidationException("Событие должно начинаться раньше его окончания");
+        }
+        BooleanBuilder builder = new BooleanBuilder();
+        if (text != null) {
+            builder.and(QEvent.event.annotation.likeIgnoreCase("%" + text.toLowerCase() + "%"))
+                   .or(QEvent.event.description.likeIgnoreCase("%" + text.toLowerCase() + "%"));
+        }
+        if (categories != null) {
+            builder.and(QEvent.event.category.id.in(categories));
+        }
+        if (paid != null) {
+            builder.and(QEvent.event.paid.eq(paid));
+        }
+        if (rangeStart != null) {
+            builder.and(QEvent.event.eventDate.after(rangeStart));
+        }
+        if (rangeEnd != null) {
+            builder.and(QEvent.event.eventDate.before(rangeEnd));
+        }
+        BooleanExpression booleanExpression = builder.getValue() == null ? QEvent.event.isNotNull() : Expressions.asBoolean(builder.getValue());
+        List<Event> events = eventRepository.findAll(booleanExpression, PageRequest.of(from / size, size)).toList();
         List<EventFullDto> eventFullDtos = events.stream()
                 .map(event -> EventMapper.toEventFullDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
-                        Math.toIntExact(stats.hits("2000-01-01 00:00:00",
-                                "3000-01-01 00:00:00",
-                                List.of(request.getRequestURL().toString()),
-                                true).get(0).getHits())))
+                        stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
+                                List.of("/events/" + event.getId()), true)))
                 .collect(Collectors.toList());
         if (onlyAvailable) {
             eventFullDtos.stream().filter(event -> event.getConfirmedRequests() < event.getParticipantLimit());
@@ -98,14 +112,12 @@ public class EventServiceImpl implements EventService {
         List<EventShortDto> eventShortDtos = events.stream()
                 .map(event -> EventMapper.toEventShortDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
-                        Math.toIntExact(stats.hits("2000-01-01 00:00:00",
-                                "3000-01-01 00:00:00",
-                                List.of(request.getRequestURL().toString()),
-                                true).get(0).getHits())))
+                        stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
+                                List.of("/events/" + event.getId()), true)))
                 .collect(Collectors.toList());
         stats.addHit(EndpointHitDto.builder()
-                .app("ewm-main")
-                .uri(request.getRequestURL().toString())
+                .app("ewm-main-service")
+                .uri("/events")
                 .ip(request.getRemoteAddr())
                 .timestamp(LocalDateTime.now())
                 .build());
@@ -119,16 +131,47 @@ public class EventServiceImpl implements EventService {
     public List<EventFullDto> eventsAdmin(List<Integer> users, List<String> states, List<Integer> categories,
                                           LocalDateTime rangeStart, LocalDateTime rangeEnd,
                                           Integer from, Integer size) {
-        return eventRepository.eventsAdmin(users, states, categories,
-                                           rangeStart, rangeEnd, PageRequest.of(from / size, size))
-                    .stream()
-                    .map(event -> EventMapper.toEventFullDto(event,
+        if (rangeStart != null && rangeEnd != null && !rangeStart.isBefore(rangeEnd)) {
+            throw new ValidationException("Событие должно начинаться раньше его окончания");
+        }
+        BooleanBuilder builder = new BooleanBuilder();
+        if (users != null) {
+            builder.and(QEvent.event.initiator.id.in(users));
+        }
+        if (states != null) {
+            states.forEach(status -> {
+                try {
+                    EventState.valueOf(status);
+                } catch (IllegalArgumentException e) {
+                    throw new ValidationException(String.format("Статус события %s не является допустимым", status));
+                }
+            });
+            builder.and(QEvent.event.eventState.in(states.stream()
+                    .map(EventState::valueOf)
+                    .collect(Collectors.toList())));
+        }
+        if (categories != null) {
+            builder.and(QEvent.event.category.id.in(categories));
+        }
+        if (rangeStart != null) {
+            builder.and(QEvent.event.eventDate.after(rangeStart));
+        }
+        if (rangeEnd != null) {
+            builder.and(QEvent.event.eventDate.before(rangeEnd));
+        }
+        BooleanExpression booleanExpression;
+        if (builder.getValue() == null) {
+            booleanExpression = QEvent.event.isNotNull();
+        } else {
+            booleanExpression = Expressions.asBoolean(builder.getValue());
+        }
+        List<Event> events = eventRepository.findAll(booleanExpression, PageRequest.of(from / size, size)).toList();
+        return events.stream()
+                     .map(event -> EventMapper.toEventFullDto(event,
                             requestRepository.countRequestConfirmed(event.getId()),
-                            Math.toIntExact(stats.hits("2000-01-01 00:00:00",
-                                    "3000-01-01 00:00:00",
-                                    List.of("/admin/events"),
-                                    true).get(0).getHits())))
-                    .collect(Collectors.toList());
+                            stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
+                                    List.of("/events/" + event.getId()), true)))
+                     .collect(Collectors.toList());
     }
 
     @Override
@@ -144,20 +187,26 @@ public class EventServiceImpl implements EventService {
             eventAdminStateAction = EventAdminStateAction.valueOf(updateEventRequest.getStateAction());
             validationStatusAdmin(event, eventAdminStateAction);
         }
-        if (updateEventRequest.getEventDate() != null) {
-            event.setEventDate(LocalDateTime.parse(updateEventRequest.getEventDate()));
+        LocalDateTime eventDate = validationBeginEventAfterNow(updateEventRequest.getEventDate());
+        if (eventDate != null) {
+            if (EventAdminStateAction.PUBLISH_EVENT == eventAdminStateAction) {
+                validationBeginEvent(eventDate, event.getPublishedOn(), 1,
+                        "Дата и время начала события не может быть раньше, чем через час от даты публикации");
+            }
+            event.setEventDate(eventDate);
         }
-        if (EventAdminStateAction.PUBLISH_EVENT == eventAdminStateAction) {
-            validationBeginEvent(event.getEventDate(), event.getPublishedOn(), 1,
-                    "Дата и время начала события не может быть раньше, чем через час от даты публикации");
-        }
+        validationSizeString(updateEventRequest.getAnnotation(),
+                updateEventRequest.getDescription(), updateEventRequest.getTitle());
         event = EventMapper.toEvent(event, updateEventRequest, category);
-        return EventMapper.toEventFullDto(eventRepository.save(event),
-                requestRepository.countRequestConfirmed(eventId),
-                Math.toIntExact(stats.hits("2000-01-01 00:00:00",
-                        "3000-01-01 00:00:00",
-                        List.of("/events/" + event.getId()),
-                        true).get(0).getHits()));
+        if (updateEventRequest.getLocation() != null) {
+            Locate locate = locateRepository.save(LocateMapper.toLocate(updateEventRequest.getLocation()));
+            event.setLocate(locate);
+        }
+        int countRequestConfirmed = requestRepository.countRequestConfirmed(eventId);
+        int countHits = stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
+                List.of("/events/" + event.getId()), true);
+        event = eventRepository.save(event);
+        return EventMapper.toEventFullDto(event, countRequestConfirmed, countHits);
     }
 
     @Override
@@ -165,11 +214,7 @@ public class EventServiceImpl implements EventService {
         getUser(userId);
         return eventRepository.findAllByInitiatorId(userId, PageRequest.of(from / size, size)).stream()
                 .map(event -> EventMapper.toEventShortDto(event,
-                            requestRepository.countRequestConfirmed(event.getId()),
-                        Math.toIntExact(stats.hits("2000-01-01 00:00:00",
-                                "3000-01-01 00:00:00",
-                                List.of("/users/{userId}/events"),
-                                true).get(0).getHits())))
+                            requestRepository.countRequestConfirmed(event.getId()), 0))
                 .collect(Collectors.toList());
     }
 
@@ -188,22 +233,20 @@ public class EventServiceImpl implements EventService {
     @Override
     public EventFullDto eventByIdForUserId(Integer userId, Integer eventId) {
         Event event = getEvent(eventId);
-        if (event.getInitiator().getId().equals(userId)) {
+        if (!event.getInitiator().getId().equals(userId)) {
             throw new ValidationException("Событие принадлежит другому пользователю");
         }
         return EventMapper.toEventFullDto(event,
                 requestRepository.countRequestConfirmed(eventId),
-                Math.toIntExact(stats.hits("2000-01-01 00:00:00",
-                        "3000-01-01 00:00:00",
-                        List.of("/events/" + event.getId()),
-                                true).get(0).getHits()));
+                stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
+                        List.of("/events/" + event.getId()), true));
     }
 
     @Override
     @Transactional
     public EventFullDto updateEvent(Integer userId, Integer eventId, UpdateEventRequest updateEventRequest) {
         Event event = getEvent(eventId);
-        if (event.getInitiator().getId().equals(userId)) {
+        if (!event.getInitiator().getId().equals(userId)) {
             throw new ValidationException("Событие принадлежит другому пользователю");
         }
         Category category = null;
@@ -218,24 +261,29 @@ public class EventServiceImpl implements EventService {
             eventPrivateStateAction = EventPrivateStateAction.valueOf(updateEventRequest.getStateAction());
             event.setEventState(validationStatusUser(event.getEventState(), eventPrivateStateAction));
         }
-        if (updateEventRequest.getEventDate() != null) {
-            event.setEventDate(LocalDateTime.parse(updateEventRequest.getEventDate()));
+        LocalDateTime eventDate = validationBeginEventAfterNow(updateEventRequest.getEventDate());
+        if (eventDate != null) {
             validationBeginEvent(event.getEventDate(), LocalDateTime.now(), 2,
                     "Дата и время начала события не может быть раньше, чем через два часа от текущего момента");
+            event.setEventDate(eventDate);
         }
+        validationSizeString(updateEventRequest.getAnnotation(),
+                updateEventRequest.getDescription(), updateEventRequest.getTitle());
         event = EventMapper.toEvent(event, updateEventRequest, category);
+        if (updateEventRequest.getLocation() != null) {
+            Locate locate = locateRepository.save(LocateMapper.toLocate(updateEventRequest.getLocation()));
+            event.setLocate(locate);
+        }
         return EventMapper.toEventFullDto(eventRepository.save(event),
                 requestRepository.countRequestConfirmed(eventId),
-                Math.toIntExact(stats.hits("2000-01-01 00:00:00",
-                        "3000-01-01 00:00:00",
-                        List.of("/events/" + event.getId()),
-                                true).get(0).getHits()));
+                stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
+                        List.of("/events/" + event.getId()), true));
     }
 
     @Override
     public List<ParticipationRequestDto> eventsForUserId(Integer userId, Integer eventId) {
         Event event = getEvent(eventId);
-        if (event.getInitiator().getId().equals(userId)) {
+        if (!event.getInitiator().getId().equals(userId)) {
             throw new ValidationException("Событие принадлежит другому пользователю");
         }
         return requestRepository.findByEventId(eventId).stream()
@@ -248,12 +296,12 @@ public class EventServiceImpl implements EventService {
     public EventRequestStatusUpdateResult updateStatusRequestsEvent(Integer userId, Integer eventId,
                                                                     EventRequestStatusUpdateRequest newStatus) {
         Event event = getEvent(eventId);
-        if (event.getInitiator().getId().equals(userId)) {
+        if (!event.getInitiator().getId().equals(userId)) {
             throw new ValidationException("Событие принадлежит другому пользователю");
         }
         List<Request> requests = requestRepository.findAllByIdIn(newStatus.getRequestIds());
         int countOld = requests.size();
-        requests.stream()
+        requests = requests.stream()
                 .filter(request -> "PENDING".equals(request.getStatus().toString()))
                 .collect(Collectors.toList());
         String requestNotPending = countOld > requests.size() ?
@@ -337,17 +385,36 @@ public class EventServiceImpl implements EventService {
 
     private void validationBeginEvent(LocalDateTime beginEvent, LocalDateTime compare, int hours, String err) {
         if (beginEvent.isBefore(compare.plusHours(hours))) {
-            throw new ConflictException(err);
+            throw new ValidationException(err);
         }
     }
 
-    private void validationStatusAdmin(Event event, EventAdminStateAction updateStatus) {
-        if (EventAdminStateAction.PUBLISH_EVENT == updateStatus && event.getEventState() == EventState.PENDING) {
-            event.setEventState(EventState.PUBLISHED);
-            event.setPublishedOn(LocalDateTime.now());
+    private LocalDateTime validationBeginEventAfterNow(String beginEvent) {
+        LocalDateTime eventDate = null;
+        if (beginEvent != null) {
+            eventDate = LocalDateTime.parse(beginEvent, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            if (!LocalDateTime.now().isBefore(eventDate)) {
+                throw new ValidationException("Начало события должно быть в будущем");
+            }
         }
-        if (EventAdminStateAction.REJECT_EVENT == updateStatus && !(event.getEventState() == EventState.PUBLISHED)) {
-            event.setEventState(EventState.CANCELED);
+        return eventDate;
+    }
+
+    private void validationStatusAdmin(Event event, EventAdminStateAction updateStatus) {
+        if (EventAdminStateAction.PUBLISH_EVENT == updateStatus) {
+            if (event.getEventState() == EventState.PENDING) {
+                event.setEventState(EventState.PUBLISHED);
+                event.setPublishedOn(LocalDateTime.now());
+            } else {
+                throw new ConflictException("Можно опубликовать только событие в состании ожидания (PENDING)");
+            }
+        }
+        if (EventAdminStateAction.REJECT_EVENT == updateStatus) {
+            if (!(event.getEventState() == EventState.PUBLISHED)) {
+                event.setEventState(EventState.CANCELED);
+            } else {
+                throw new ConflictException("Отклонить событие можно только если оно не опубликовано (не PUBLISHED)");
+            }
         }
     }
 
@@ -359,5 +426,32 @@ public class EventServiceImpl implements EventService {
             return EventState.CANCELED;
         }
         return eventState;
+    }
+
+    private void validationSizeString(String annotation, String description, String title) {
+        if (annotation != null) {
+            if (annotation.length() < 20) {
+                throw new ValidationException("Слишком короткий заголовок, min = 20");
+            }
+            if (annotation.length() > 2000) {
+                throw new ValidationException("Слишком длинный заголовок, max = 2000");
+            }
+        }
+        if (description != null) {
+            if (description.length() < 20) {
+                throw new ValidationException("Слишком короткое описание, min = 20");
+            }
+            if (description.length() > 7000) {
+                throw new ValidationException("Слишком длинное описание, max = 7000");
+            }
+        }
+        if (title != null) {
+            if (title.length() < 3) {
+                throw new ValidationException("Слишком короткий заголовок, min = 3");
+            }
+            if (title.length() > 120) {
+                throw new ValidationException("Слишком длинный заголовок, max = 120");
+            }
+        }
     }
 }

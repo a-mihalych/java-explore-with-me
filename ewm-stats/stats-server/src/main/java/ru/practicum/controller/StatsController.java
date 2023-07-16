@@ -28,8 +28,8 @@ public class StatsController {
 
     @GetMapping("/stats")
     @ResponseStatus(HttpStatus.OK)
-    public List<ViewStatsDto> hits(@RequestParam LocalDateTime start,
-                                   @RequestParam LocalDateTime end,
+    public List<ViewStatsDto> hits(@RequestParam(required = false) LocalDateTime start,
+                                   @RequestParam(required = false) LocalDateTime end,
                                    @RequestParam(required = false) List<String> uris,
                                    @RequestParam(defaultValue = "false") Boolean unique) {
         log.info("* Запрос Get: получение статистики: начало - {}, конец - {}, адреса - {}, уникалность - {}",

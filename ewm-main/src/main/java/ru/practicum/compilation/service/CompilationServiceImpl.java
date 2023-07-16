@@ -11,6 +11,7 @@ import ru.practicum.compilation.mapper.CompilationMapper;
 import ru.practicum.compilation.model.Compilation;
 import ru.practicum.compilation.repository.CompilationRepository;
 import ru.practicum.error.exception.NotFoundException;
+import ru.practicum.error.exception.ValidationException;
 import ru.practicum.event.dto.EventShortDto;
 import ru.practicum.event.mapper.EventMapper;
 import ru.practicum.event.model.Event;
@@ -34,14 +35,18 @@ public class CompilationServiceImpl implements CompilationService {
 
     @Override
     public List<CompilationDto> compilations(Boolean pinned, Integer from, Integer size) {
-        return compilationRepository.findAllByPinned(pinned, PageRequest.of(from / size, size)).stream()
+        List<Compilation> compilations;
+        if (pinned == null) {
+            compilations = compilationRepository.findAll(PageRequest.of(from / size, size)).toList();
+        } else {
+            compilations = compilationRepository.findAllByPinned(pinned, PageRequest.of(from / size, size));
+        }
+        return compilations.stream()
                 .map(compilation -> CompilationMapper.toCompilationDto(compilation, compilation.getEvents().stream()
                         .map(event -> EventMapper.toEventShortDto(event,
                                 requestRepository.countRequestConfirmed(event.getId()),
-                                Math.toIntExact(stats.hits("2000-01-01 00:00:00",
-                                        "3000-01-01 00:00:00",
-                                        List.of("/users/{userId}/events"),
-                                        true).get(0).getHits())))
+                                stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
+                                        List.of("/events/" + event.getId()), true)))
                         .collect(Collectors.toList())))
                 .collect(Collectors.toList());
     }
@@ -54,10 +59,8 @@ public class CompilationServiceImpl implements CompilationService {
         List<EventShortDto> eventShortDtos = compilation.getEvents().stream()
                 .map(event -> EventMapper.toEventShortDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
-                        Math.toIntExact(stats.hits("2000-01-01 00:00:00",
-                                "3000-01-01 00:00:00",
-                                List.of("/users/{userId}/events"),
-                                true).get(0).getHits())))
+                        stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
+                                List.of("/events/" + event.getId()), true)))
                 .collect(Collectors.toList());
         return CompilationMapper.toCompilationDto(compilation, eventShortDtos);
     }
@@ -79,10 +82,8 @@ public class CompilationServiceImpl implements CompilationService {
         List<EventShortDto> eventShortDtos = compilation.getEvents().stream()
                 .map(event -> EventMapper.toEventShortDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
-                        Math.toIntExact(stats.hits("2000-01-01 00:00:00",
-                                "3000-01-01 00:00:00",
-                                List.of("/events/" + event.getId()),
-                                true).get(0).getHits())))
+                        stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
+                                List.of("/events/" + event.getId()), true)))
                 .collect(Collectors.toList());
         return CompilationMapper.toCompilationDto(compilation, eventShortDtos);
     }
@@ -99,9 +100,13 @@ public class CompilationServiceImpl implements CompilationService {
     @Override
     @Transactional
     public CompilationDto updateCompilation(Integer compId, UpdateCompilationRequest updateCompilationRequest) {
-        compilationRepository.findById(compId).orElseThrow(() -> {
+        Compilation compilation = compilationRepository.findById(compId).orElseThrow(() -> {
             throw new NotFoundException(String.format("Не найдена подборка с id = %d", compId));
         });
+        if (updateCompilationRequest.getTitle() != null && updateCompilationRequest.getTitle().length() > 50) {
+            throw new ValidationException(String.format("Зоголовок '%s' превышает ограничение в 50 символов",
+                    updateCompilationRequest.getTitle()));
+        }
         List<Event> events = new ArrayList<>();
         if (updateCompilationRequest.getEvents() != null) {
             events = updateCompilationRequest.getEvents().stream()
@@ -115,11 +120,12 @@ public class CompilationServiceImpl implements CompilationService {
         List<EventShortDto> eventShortDtos = events.stream()
                 .map(event -> EventMapper.toEventShortDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
-                        Math.toIntExact(stats.hits("2000-01-01 00:00:00",
-                                "3000-01-01 00:00:00",
-                                List.of("/users/{userId}/events"),
-                                true).get(0).getHits())))
+                        stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
+                                List.of("/events/" + event.getId()), true)))
                 .collect(Collectors.toList());
+        if (updateCompilationRequest.getTitle() == null) {
+            updateCompilationRequest.setTitle(compilation.getTitle());
+        }
         return CompilationMapper.toCompilationDto(compilationRepository
                 .save(CompilationMapper.toCompilation(compId, updateCompilationRequest, events)), eventShortDtos);
     }
