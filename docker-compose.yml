@@ -13,7 +13,7 @@ services:
       - SPRING_DATASOURCE_URL=jdbc:postgresql://main_db:5432/postgres_main
 
   statistics-server:
-    build: ewm-stats
+    build: ewm-stats/stats-server
     container_name: statistics-server
     ports:
       - "9090:9090"
