@@ -109,13 +109,7 @@ public class CompilationServiceImpl implements CompilationService {
         }
         List<Event> events = new ArrayList<>();
         if (updateCompilationRequest.getEvents() != null) {
-            events = updateCompilationRequest.getEvents().stream()
-                    .map(id -> {
-                        return eventRepository.findById(id).orElseThrow(() -> {
-                            throw new NotFoundException(String.format("Не найдено события с id = %d", id));
-                        });
-                    })
-                    .collect(Collectors.toList());
+            events = eventRepository.findByIdIn(updateCompilationRequest.getEvents());
         }
         List<EventShortDto> eventShortDtos = events.stream()
                 .map(event -> EventMapper.toEventShortDto(event,

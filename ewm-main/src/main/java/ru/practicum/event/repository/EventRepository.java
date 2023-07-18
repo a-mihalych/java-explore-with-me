@@ -10,4 +10,6 @@ import java.util.List;
 public interface EventRepository extends JpaRepository<Event, Integer>, QuerydslPredicateExecutor<Event> {
 
     List<Event> findAllByInitiatorId(Integer userId, Pageable pageable);
+
+    List<Event> findByIdIn(List<Integer> events);
 }

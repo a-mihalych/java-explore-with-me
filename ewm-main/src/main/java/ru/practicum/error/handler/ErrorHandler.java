@@ -3,6 +3,8 @@ package ru.practicum.error.handler;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -19,6 +21,20 @@ public class ErrorHandler {
     @ExceptionHandler
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handlerValidationException(final ValidationException e) {
+        log.warn("400: ErrorHandler, {}", e.getMessage());
+        return new ErrorResponse(e.getMessage());
+    }
+
+    @ExceptionHandler
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handlerMissingServletRequestParameterException(final MissingServletRequestParameterException e) {
+        log.warn("400: ErrorHandler, {}", e.getMessage());
+        return new ErrorResponse(e.getMessage());
+    }
+
+    @ExceptionHandler
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handlerMethodArgumentNotValidException(final MethodArgumentNotValidException e) {
         log.warn("400: ErrorHandler, {}", e.getMessage());
         return new ErrorResponse(e.getMessage());
     }
@@ -47,6 +63,13 @@ public class ErrorHandler {
     @ExceptionHandler
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public ErrorResponse handlerExploreWithMeException(final ExploreWithMeException e) {
+        log.warn("500: ErrorHandler, {}", e);
+        return new ErrorResponse(e.getMessage());
+    }
+
+    @ExceptionHandler
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ErrorResponse handlerThrowableException(final Throwable e) {
         log.warn("500: ErrorHandler, {}", e);
         return new ErrorResponse(e.getMessage());
     }
