@@ -15,10 +15,9 @@ public class BaseClient {
         this.rest = rest;
     }
 
-    protected ResponseEntity<Object> get(String path, String start, String end, List<String> uris, Boolean unique) {
+    protected ResponseEntity<Object> get(String path, String start, String end, Boolean unique) {
         Map<String, Object> parameters = Map.of("start", start,
                                                 "end", end,
-                                                "uris", uris,
                                                 "unique", unique);
         return get(path, parameters);
     }
