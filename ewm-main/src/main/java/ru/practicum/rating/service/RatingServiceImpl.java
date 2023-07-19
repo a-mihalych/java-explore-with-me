@@ -8,6 +8,7 @@ import ru.practicum.error.exception.NotFoundException;
 import ru.practicum.event.dto.EventShortDto;
 import ru.practicum.event.mapper.EventMapper;
 import ru.practicum.event.model.Event;
+import ru.practicum.event.model.EventState;
 import ru.practicum.event.repository.EventRepository;
 import ru.practicum.rating.dto.NewRating;
 import ru.practicum.rating.dto.RatingDto;
@@ -41,14 +42,24 @@ public class RatingServiceImpl implements RatingService {
         User user = getUser(userId);
         UserShortDto userShortDto = UserMapper.toUserShortDto(user);
         Event event = getEvent(newRating.getEventId());
-        EventShortDto eventShortDto = EventMapper.toEventShortDto(event,
-                requestRepository.countRequestConfirmed(event.getId()),
-                stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
-                                List.of("/events/" + event.getId()), true));
+        if (event.getEventState() != EventState.PUBLISHED) {
+            throw new ConflictException("Рейтин можно добавить только опубликованому событию");
+        }
         Rating rating = ratingRepository.findByUserIdAndEventId(userShortDto.getId(), event.getId());
         if (rating != null) {
             throw new ConflictException("Такой рейтинг уже существует");
         }
+        int like = ratingRepository.countRatingTrue(event.getId());
+        int dislike = ratingRepository.countRatingFalse(event.getId());
+        if (newRating.getStatus()) {
+            like++;
+        } else {
+            dislike++;
+        }
+        EventShortDto eventShortDto = EventMapper.toEventShortDto(event,
+                requestRepository.countRequestConfirmed(event.getId()),
+                stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
+                                List.of("/events/" + event.getId()), true), like, dislike);
         return RatingMapper.toRatingDto(ratingRepository.save(Rating.builder()
                                                               .user(user)
                                                               .event(event)
@@ -73,15 +84,15 @@ public class RatingServiceImpl implements RatingService {
         User user = getUser(userId);
         UserShortDto userShortDto = UserMapper.toUserShortDto(user);
         Event event = getEvent(eventId);
+        int like = ratingRepository.countRatingTrue(eventId);
+        int dislike = ratingRepository.countRatingFalse(eventId);
         EventShortDto eventShortDto = EventMapper.toEventShortDto(event,
                 requestRepository.countRequestConfirmed(event.getId()),
                 stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
-                        List.of("/events/" + event.getId()), true));
+                        List.of("/events/" + event.getId()), true), like, dislike);
         return RatingEventDto.builder()
                 .user(userShortDto)
                 .event(eventShortDto)
-                .ratingTrue(ratingRepository.countRatingTrue(eventId))
-                .ratingFalse(ratingRepository.countRatingFalse(eventId))
                 .build();
     }
 

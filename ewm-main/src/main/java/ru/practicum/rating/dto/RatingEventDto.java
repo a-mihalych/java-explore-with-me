@@ -14,6 +14,4 @@ public class RatingEventDto {
 
     private UserShortDto user;
     private EventShortDto event;
-    private Integer ratingTrue;
-    private Integer ratingFalse;
 }
