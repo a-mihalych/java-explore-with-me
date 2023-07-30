@@ -16,6 +16,7 @@ import ru.practicum.event.dto.EventShortDto;
 import ru.practicum.event.mapper.EventMapper;
 import ru.practicum.event.model.Event;
 import ru.practicum.event.repository.EventRepository;
+import ru.practicum.rating.repository.RatingRepository;
 import ru.practicum.request.repository.RequestRepository;
 import ru.practicum.stats.Stats;
 
@@ -31,6 +32,7 @@ public class CompilationServiceImpl implements CompilationService {
     private final CompilationRepository compilationRepository;
     private final RequestRepository requestRepository;
     private final EventRepository eventRepository;
+    private final RatingRepository ratingRepository;
     private final Stats stats;
 
     @Override
@@ -46,7 +48,9 @@ public class CompilationServiceImpl implements CompilationService {
                         .map(event -> EventMapper.toEventShortDto(event,
                                 requestRepository.countRequestConfirmed(event.getId()),
                                 stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
-                                        List.of("/events/" + event.getId()), true)))
+                                        List.of("/events/" + event.getId()), true),
+                                ratingRepository.countRatingTrue(event.getId()),
+                                ratingRepository.countRatingFalse(event.getId())))
                         .collect(Collectors.toList())))
                 .collect(Collectors.toList());
     }
@@ -60,7 +64,9 @@ public class CompilationServiceImpl implements CompilationService {
                 .map(event -> EventMapper.toEventShortDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
                         stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
-                                List.of("/events/" + event.getId()), true)))
+                                List.of("/events/" + event.getId()), true),
+                        ratingRepository.countRatingTrue(event.getId()),
+                        ratingRepository.countRatingFalse(event.getId())))
                 .collect(Collectors.toList());
         return CompilationMapper.toCompilationDto(compilation, eventShortDtos);
     }
@@ -83,7 +89,9 @@ public class CompilationServiceImpl implements CompilationService {
                 .map(event -> EventMapper.toEventShortDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
                         stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
-                                List.of("/events/" + event.getId()), true)))
+                                List.of("/events/" + event.getId()), true),
+                        ratingRepository.countRatingTrue(event.getId()),
+                        ratingRepository.countRatingFalse(event.getId())))
                 .collect(Collectors.toList());
         return CompilationMapper.toCompilationDto(compilation, eventShortDtos);
     }
@@ -109,19 +117,15 @@ public class CompilationServiceImpl implements CompilationService {
         }
         List<Event> events = new ArrayList<>();
         if (updateCompilationRequest.getEvents() != null) {
-            events = updateCompilationRequest.getEvents().stream()
-                    .map(id -> {
-                        return eventRepository.findById(id).orElseThrow(() -> {
-                            throw new NotFoundException(String.format("Не найдено события с id = %d", id));
-                        });
-                    })
-                    .collect(Collectors.toList());
+            events = eventRepository.findByIdIn(updateCompilationRequest.getEvents());
         }
         List<EventShortDto> eventShortDtos = events.stream()
                 .map(event -> EventMapper.toEventShortDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
                         stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
-                                List.of("/events/" + event.getId()), true)))
+                                List.of("/events/" + event.getId()), true),
+                        ratingRepository.countRatingTrue(event.getId()),
+                        ratingRepository.countRatingFalse(event.getId())))
                 .collect(Collectors.toList());
         if (updateCompilationRequest.getTitle() == null) {
             updateCompilationRequest.setTitle(compilation.getTitle());

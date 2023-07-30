@@ -21,6 +21,7 @@ import ru.practicum.event.repository.EventRepository;
 import ru.practicum.locate.mapper.LocateMapper;
 import ru.practicum.locate.model.Locate;
 import ru.practicum.locate.repository.LocateRepository;
+import ru.practicum.rating.repository.RatingRepository;
 import ru.practicum.request.dto.EventRequestStatusUpdateRequest;
 import ru.practicum.request.dto.EventRequestStatusUpdateResult;
 import ru.practicum.request.dto.ParticipationRequestDto;
@@ -51,6 +52,7 @@ public class EventServiceImpl implements EventService {
     private final UserRepository userRepository;
     private final LocateRepository locateRepository;
     private final RequestRepository requestRepository;
+    private final RatingRepository ratingRepository;
     private final Stats stats;
 
     @Override
@@ -67,7 +69,9 @@ public class EventServiceImpl implements EventService {
                         .build());
         int countHits = stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
                                         List.of("/events/" + event.getId()), true);
-        return EventMapper.toEventFullDto(event, requestRepository.countRequestConfirmed(id), countHits);
+        int like = ratingRepository.countRatingTrue(event.getId());
+        int dislike = ratingRepository.countRatingFalse(event.getId());
+        return EventMapper.toEventFullDto(event, requestRepository.countRequestConfirmed(id), countHits, like, dislike);
     }
 
     @Override
@@ -104,7 +108,9 @@ public class EventServiceImpl implements EventService {
                 .map(event -> EventMapper.toEventFullDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
                         stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
-                                List.of("/events/" + event.getId()), true)))
+                                List.of("/events/" + event.getId()), true),
+                        ratingRepository.countRatingTrue(event.getId()),
+                        ratingRepository.countRatingFalse(event.getId())))
                 .collect(Collectors.toList());
         if (onlyAvailable) {
             eventFullDtos.stream().filter(event -> event.getConfirmedRequests() < event.getParticipantLimit());
@@ -113,7 +119,9 @@ public class EventServiceImpl implements EventService {
                 .map(event -> EventMapper.toEventShortDto(event,
                         requestRepository.countRequestConfirmed(event.getId()),
                         stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
-                                List.of("/events/" + event.getId()), true)))
+                                List.of("/events/" + event.getId()), true),
+                        ratingRepository.countRatingTrue(event.getId()),
+                        ratingRepository.countRatingFalse(event.getId())))
                 .collect(Collectors.toList());
         stats.addHit(EndpointHitDto.builder()
                 .app("ewm-main-service")
@@ -170,7 +178,9 @@ public class EventServiceImpl implements EventService {
                      .map(event -> EventMapper.toEventFullDto(event,
                             requestRepository.countRequestConfirmed(event.getId()),
                             stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
-                                    List.of("/events/" + event.getId()), true)))
+                                    List.of("/events/" + event.getId()), true),
+                             ratingRepository.countRatingTrue(event.getId()),
+                             ratingRepository.countRatingFalse(event.getId())))
                      .collect(Collectors.toList());
     }
 
@@ -206,7 +216,9 @@ public class EventServiceImpl implements EventService {
         int countHits = stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
                 List.of("/events/" + event.getId()), true);
         event = eventRepository.save(event);
-        return EventMapper.toEventFullDto(event, countRequestConfirmed, countHits);
+        return EventMapper.toEventFullDto(event, countRequestConfirmed, countHits,
+                ratingRepository.countRatingTrue(event.getId()),
+                ratingRepository.countRatingFalse(event.getId()));
     }
 
     @Override
@@ -214,7 +226,11 @@ public class EventServiceImpl implements EventService {
         getUser(userId);
         return eventRepository.findAllByInitiatorId(userId, PageRequest.of(from / size, size)).stream()
                 .map(event -> EventMapper.toEventShortDto(event,
-                            requestRepository.countRequestConfirmed(event.getId()), 0))
+                            requestRepository.countRequestConfirmed(event.getId()),
+                        stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
+                                List.of("/events/" + event.getId()), true),
+                        ratingRepository.countRatingTrue(event.getId()),
+                        ratingRepository.countRatingFalse(event.getId())))
                 .collect(Collectors.toList());
     }
 
@@ -227,7 +243,7 @@ public class EventServiceImpl implements EventService {
         Event event = EventMapper.toEvent(newEventDto, category, initiator, locate);
         validationBeginEvent(event.getEventDate(), event.getCreatedOn(), 2,
                 "Дата и время начала события не может быть раньше, чем через два часа от текущего момента");
-        return EventMapper.toEventFullDto(eventRepository.save(event), 0, 0);
+        return EventMapper.toEventFullDto(eventRepository.save(event), 0, 0, 0, 0);
     }
 
     @Override
@@ -239,7 +255,9 @@ public class EventServiceImpl implements EventService {
         return EventMapper.toEventFullDto(event,
                 requestRepository.countRequestConfirmed(eventId),
                 stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
-                        List.of("/events/" + event.getId()), true));
+                        List.of("/events/" + event.getId()), true),
+                ratingRepository.countRatingTrue(event.getId()),
+                ratingRepository.countRatingFalse(event.getId()));
     }
 
     @Override
@@ -277,7 +295,9 @@ public class EventServiceImpl implements EventService {
         return EventMapper.toEventFullDto(eventRepository.save(event),
                 requestRepository.countRequestConfirmed(eventId),
                 stats.countHits(Stats.DATE_TIME_MIN, Stats.DATE_TIME_MAX,
-                        List.of("/events/" + event.getId()), true));
+                        List.of("/events/" + event.getId()), true),
+                ratingRepository.countRatingTrue(event.getId()),
+                ratingRepository.countRatingFalse(event.getId()));
     }
 
     @Override

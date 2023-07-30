@@ -38,7 +38,8 @@ public class EventMapper {
                 .build();
     }
 
-    public static EventFullDto toEventFullDto(Event event, Integer confirmedRequests, Integer views) {
+    public static EventFullDto toEventFullDto(Event event, Integer confirmedRequests,
+                                              Integer views, Integer like, Integer dislike) {
         return EventFullDto.builder()
                 .id(event.getId())
                 .annotation(event.getAnnotation())
@@ -56,10 +57,13 @@ public class EventMapper {
                 .state(event.getEventState().name())
                 .title(event.getTitle())
                 .views(views)
+                .like(like)
+                .dislike(dislike)
                 .build();
     }
 
-    public static EventShortDto toEventShortDto(Event event, Integer confirmedRequests, Integer views) {
+    public static EventShortDto toEventShortDto(Event event, Integer confirmedRequests,
+                                                Integer views, Integer like, Integer dislike) {
         return EventShortDto.builder()
                 .id(event.getId())
                 .annotation(event.getAnnotation())
@@ -70,6 +74,8 @@ public class EventMapper {
                 .paid(event.getPaid())
                 .title(event.getTitle())
                 .views(views)
+                .like(like)
+                .dislike(dislike)
                 .build();
     }
 

@@ -11,9 +11,6 @@ import ru.practicum.locate.dto.Location;
 @AllArgsConstructor
 public class UpdateEventRequest {
 
-    // todo общий класс (UpdateEventAdminRequest и UpdateEventUserRequest),
-    //  так как два класса были обсолютно одинаковые (те два надо удалить)
-
     private String annotation;
     private Integer category;
     private String description;
